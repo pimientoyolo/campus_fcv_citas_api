@@ -74,6 +74,8 @@ class AuthIntegrationTest {
         data.put("firstName", "Paciente"); data.put("email", "invalid"); postJson("/register", data).andExpect(status().isBadRequest());
         data.put("email", "synthetic@example.test"); data.put("password", "corta"); postJson("/register", data).andExpect(status().isBadRequest());
         data.put("password", "ñ".repeat(40)); postJson("/register", data).andExpect(status().isBadRequest());
+        postJson("/login", Map.of("email", "synthetic@example.test", "password", "ñ".repeat(40)))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test void sessionLifecycleAndTokenSeparation() throws Exception {

@@ -42,6 +42,7 @@ public final class AuthService {
     }
 
     public Login login(String email, String password) {
+        if (password.getBytes(StandardCharsets.UTF_8).length > 72) throw AuthFailure.unauthorized();
         User user = users.byEmail(normalizeEmail(email)).orElse(null);
         boolean matches = passwords.matches(password, user == null ? dummyHash : user.passwordHash());
         if (!matches || user == null || !user.active()) throw AuthFailure.unauthorized();
