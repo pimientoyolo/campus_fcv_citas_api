@@ -18,6 +18,8 @@ spring:
       hibernate.jdbc.time_zone: UTC
   flyway:
     enabled: true
+    repair-on-migrate: true
+    baseline-on-migrate: true
   jackson:
     deserialization:
       fail-on-unknown-properties: true

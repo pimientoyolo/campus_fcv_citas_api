@@ -15,7 +15,7 @@ CREATE TABLE app_users (
 CREATE TABLE roles (
     code VARCHAR(20) NOT NULL PRIMARY KEY
 );
-INSERT INTO roles (code) VALUES ('USER'), ('PROFESSIONAL'), ('ADMIN');
+INSERT IGNORE INTO roles (code) VALUES ('USER'), ('PROFESSIONAL'), ('ADMIN');
 
 CREATE TABLE user_roles (
     user_id BIGINT NOT NULL,
