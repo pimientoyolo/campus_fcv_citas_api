@@ -1,0 +1,118 @@
+{
+  "name": "WF-003 - FCV Citas Resumen Operativo Diario",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "11112222-3333-4444-5555-666677778888",
+      "name": "Schedule Trigger (20:00 Diario)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://citas-api-dev:8080/api/integrations/reports/daily-summary",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Integration-Key",
+              "value": "={{ $env.FCV_INTEGRATION_KEY || 'fcv-n8n-integration-secret-key-2026' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "22223333-4444-5555-6666-777788889999",
+      "name": "Consultar Resumen Diario (API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst date = data.date || new Date().toISOString().substring(0, 10);\nconst total = data.totalAppointments || 0;\nconst byStatus = data.byStatus || {};\nconst byLocation = data.byLocation || {};\n\nlet html = `<h2>Resumen Operativo Diario FCV Citas (${date})</h2>`;\nhtml += `<p><strong>Total de citas procesadas:</strong> ${total}</p>`;\nhtml += `<h3>Distribución por Estado:</h3><ul>`;\nfor (const [st, count] of Object.entries(byStatus)) {\n  html += `<li><strong>${st}:</strong> ${count}</li>`;\n}\nhtml += `</ul>`;\nhtml += `<h3>Distribución por Sede:</h3><ul>`;\nfor (const [loc, count] of Object.entries(byLocation)) {\n  html += `<li><strong>${loc}:</strong> ${count}</li>`;\n}\nhtml += `</ul>`;\n\nreturn [{\n  json: {\n    date,\n    total,\n    htmlSummary: html,\n    recipient: 'operaciones@fcv.test'\n  }\n}];"
+      },
+      "id": "33334444-5555-6666-7777-888899990000",
+      "name": "Construir Tabla HTML de Métricas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.recipient }}",
+        "subject": "={{ 'FCV Citas - Informe de Operaciones Diario [' + $json.date + ']' }}",
+        "message": "={{ $json.htmlSummary }}"
+      },
+      "id": "44445555-6666-7777-8888-999900001111",
+      "name": "Enviar Correo a Dirección Operativa",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        910,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (20:00 Diario)": {
+      "main": [
+        [
+          {
+            "node": "Consultar Resumen Diario (API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Resumen Diario (API)": {
+      "main": [
+        [
+          {
+            "node": "Construir Tabla HTML de Métricas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir Tabla HTML de Métricas": {
+      "main": [
+        [
+          {
+            "node": "Enviar Correo a Dirección Operativa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fcv-s6-wf003-v1",
+  "id": "fcv-wf-003-daily-summary"
+}

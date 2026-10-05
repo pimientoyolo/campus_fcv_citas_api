@@ -4,6 +4,7 @@ import co.fcv.citas.application.SchedulingService;
 import co.fcv.citas.domain.*;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -168,4 +169,30 @@ public class SchedulingFacade {
     public AppointmentReschedule rejectReschedule(Long rescheduleId, String rejectionReason, Long adminUserId) {
         return service.rejectReschedule(rescheduleId, rejectionReason, adminUserId);
     }
+
+    @Transactional(readOnly = true)
+    public List<UpcomingAppointmentView> getUpcomingAppointments(int hoursAhead) {
+        return service.getUpcomingAppointments(hoursAhead);
+    }
+
+    @Transactional
+    public AppointmentReminder recordReminder(Long appointmentId, String channel) {
+        return service.recordReminder(appointmentId, channel);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationEvent> getPendingEvents() {
+        return service.getPendingEvents();
+    }
+
+    @Transactional
+    public void markEventProcessed(Long eventId) {
+        service.markEventProcessed(eventId);
+    }
+
+    @Transactional(readOnly = true)
+    public Map<String, Object> getDailyOperationalSummary(LocalDate date) {
+        return service.getDailyOperationalSummary(date);
+    }
 }
+

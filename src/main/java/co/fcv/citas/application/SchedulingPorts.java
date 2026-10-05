@@ -79,4 +79,15 @@ public final class SchedulingPorts {
         List<AppointmentReschedule> findByAppointmentId(Long appointmentId);
         List<AppointmentReschedule> findByStatusId(Short statusId);
     }
+
+    public interface Integrations {
+        void publishEvent(String eventType, Long aggregateId, String payload);
+        List<NotificationEvent> findPendingEvents();
+        void markEventProcessed(Long eventId);
+        AppointmentReminder saveReminder(AppointmentReminder reminder);
+        List<AppointmentReminder> findRemindersByAppointmentId(Long appointmentId);
+        List<UpcomingAppointmentView> findUpcomingApprovedAppointments(LocalDateTime from, LocalDateTime to);
+        List<Appointment> findAppointmentsForDate(LocalDate date);
+    }
 }
+

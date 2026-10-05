@@ -20,6 +20,7 @@ public class SchedulingService {
     private final AuthPorts.Passwords passwords;
     private final Affiliations affiliations;
     private final Reschedules reschedules;
+    private final Integrations integrations;
     private final Clock clock;
 
     public SchedulingService(Catalogs catalogs, Professionals professionals,
@@ -30,7 +31,7 @@ public class SchedulingService {
                              AuthPorts.Users users,
                              AuthPorts.Passwords passwords,
                              Clock clock) {
-        this(catalogs, professionals, availabilityBlocks, professionalSlots, appointments, histories, users, passwords, null, null, clock);
+        this(catalogs, professionals, availabilityBlocks, professionalSlots, appointments, histories, users, passwords, null, null, null, clock);
     }
 
     public SchedulingService(Catalogs catalogs, Professionals professionals,
@@ -43,6 +44,20 @@ public class SchedulingService {
                              Affiliations affiliations,
                              Reschedules reschedules,
                              Clock clock) {
+        this(catalogs, professionals, availabilityBlocks, professionalSlots, appointments, histories, users, passwords, affiliations, reschedules, null, clock);
+    }
+
+    public SchedulingService(Catalogs catalogs, Professionals professionals,
+                             AvailabilityBlocks availabilityBlocks,
+                             ProfessionalSlots professionalSlots,
+                             Appointments appointments,
+                             AppointmentHistories histories,
+                             AuthPorts.Users users,
+                             AuthPorts.Passwords passwords,
+                             Affiliations affiliations,
+                             Reschedules reschedules,
+                             Integrations integrations,
+                             Clock clock) {
         this.catalogs = catalogs;
         this.professionals = professionals;
         this.availabilityBlocks = availabilityBlocks;
@@ -53,6 +68,7 @@ public class SchedulingService {
         this.passwords = passwords;
         this.affiliations = affiliations;
         this.reschedules = reschedules;
+        this.integrations = integrations;
         this.clock = clock;
     }
 
@@ -347,6 +363,9 @@ public class SchedulingService {
                 null, app.id(), cancelled.id(), userId, isAdmin ? "ADMIN" : "USER", null,
                 isAdmin ? "Cancelada por administración" : "Cancelada por el paciente"));
 
+        publishNotification("APPOINTMENT_CANCELLED", updated.id(),
+                "{\"appointmentId\":" + updated.id() + ",\"cancelledBy\":" + userId + "}");
+
         return updated;
     }
 
@@ -370,6 +389,9 @@ public class SchedulingService {
 
         histories.record(new AppointmentStatusHistory(
                 null, app.id(), approved.id(), adminUserId, "ADMIN", null, "Aprobada por administración"));
+
+        publishNotification("APPOINTMENT_APPROVED", updated.id(),
+                "{\"appointmentId\":" + updated.id() + ",\"patientUserId\":" + updated.patientUserId() + ",\"approvedBy\":" + adminUserId + "}");
 
         return updated;
     }
@@ -401,6 +423,9 @@ public class SchedulingService {
 
         histories.record(new AppointmentStatusHistory(
                 null, app.id(), rejected.id(), adminUserId, "ADMIN", null, reason.strip()));
+
+        publishNotification("APPOINTMENT_REJECTED", updated.id(),
+                "{\"appointmentId\":" + updated.id() + ",\"patientUserId\":" + updated.patientUserId() + ",\"reason\":\"" + reason.strip() + "\"}");
 
         return updated;
     }
@@ -605,7 +630,10 @@ public class SchedulingService {
                 null, app.createdAt(), clock.instant()));
         histories.record(new AppointmentStatusHistory(null, app.id(), (short) 2, adminUserId, "ADMIN", clock.instant(), "Reprogramación aprobada: " + res.reason()));
 
-        return reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 2, "APPROVED", res.reason(), null, res.createdAt(), clock.instant()));
+        AppointmentReschedule approvedRes = reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 2, "APPROVED", res.reason(), null, res.createdAt(), clock.instant()));
+        publishNotification("RESCHEDULE_APPROVED", approvedRes.id(),
+                "{\"rescheduleId\":" + approvedRes.id() + ",\"appointmentId\":" + approvedRes.appointmentId() + ",\"newStartAt\":\"" + approvedRes.newStartAt() + "\"}");
+        return approvedRes;
     }
 
     public AppointmentReschedule rejectReschedule(Long rescheduleId, String rejectionReason, Long adminUserId) {
@@ -618,6 +646,69 @@ public class SchedulingService {
         if (res.statusId() != 1) {
             throw SchedulingFailure.invalid("La solicitud ya fue procesada.");
         }
-        return reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 3, "REJECTED", res.reason(), rejectionReason.strip(), res.createdAt(), clock.instant()));
+        AppointmentReschedule updated = reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 3, "REJECTED", res.reason(), rejectionReason.strip(), res.createdAt(), clock.instant()));
+        publishNotification("RESCHEDULE_REJECTED", updated.id(), "{\"rescheduleId\":" + updated.id() + ",\"appointmentId\":" + updated.appointmentId() + ",\"reason\":\"" + rejectionReason.strip() + "\"}");
+        return updated;
+    }
+
+    // --- Métodos de Integraciones (S5, S6) ---
+
+    public void publishNotification(String eventType, Long aggregateId, String payload) {
+        if (integrations != null) {
+            integrations.publishEvent(eventType, aggregateId, payload != null ? payload : "{}");
+        }
+    }
+
+    public List<UpcomingAppointmentView> getUpcomingAppointments(int hoursAhead) {
+        LocalDateTime now = LocalDateTime.now(clock);
+        LocalDateTime to = now.plusHours(hoursAhead > 0 ? hoursAhead : 48);
+        return integrations != null ? integrations.findUpcomingApprovedAppointments(now, to) : List.of();
+    }
+
+    public AppointmentReminder recordReminder(Long appointmentId, String channel) {
+        if (integrations == null) return null;
+        return integrations.saveReminder(new AppointmentReminder(
+                null, appointmentId, clock.instant(), clock.instant(), "SENT", channel != null ? channel : "EMAIL"
+        ));
+    }
+
+    public List<NotificationEvent> getPendingEvents() {
+        return integrations != null ? integrations.findPendingEvents() : List.of();
+    }
+
+    public void markEventProcessed(Long eventId) {
+        if (integrations != null) {
+            integrations.markEventProcessed(eventId);
+        }
+    }
+
+    public Map<String, Object> getDailyOperationalSummary(LocalDate date) {
+        LocalDate targetDate = date != null ? date : LocalDate.now(clock);
+        List<Appointment> apps = integrations != null ? integrations.findAppointmentsForDate(targetDate) : List.of();
+
+        Map<Short, String> statusNames = new HashMap<>();
+        catalogs.findAllAppointmentStatuses().forEach(s -> statusNames.put(s.id(), s.code()));
+
+        Map<Short, String> locNames = new HashMap<>();
+        catalogs.findAllLocations().forEach(l -> locNames.put(l.id(), l.name()));
+
+        Map<String, Long> byStatus = new HashMap<>();
+        Map<String, Long> byLocation = new HashMap<>();
+
+        for (Appointment a : apps) {
+            String sc = statusNames.getOrDefault(a.statusId(), "UNKNOWN");
+            byStatus.put(sc, byStatus.getOrDefault(sc, 0L) + 1);
+
+            String ln = locNames.getOrDefault(a.locationId(), "UNKNOWN");
+            byLocation.put(ln, byLocation.getOrDefault(ln, 0L) + 1);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("date", targetDate.toString());
+        result.put("totalAppointments", apps.size());
+        result.put("byStatus", byStatus);
+        result.put("byLocation", byLocation);
+        return result;
     }
 }
+

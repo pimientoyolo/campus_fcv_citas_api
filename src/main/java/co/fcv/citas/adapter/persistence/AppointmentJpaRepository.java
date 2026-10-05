@@ -38,4 +38,27 @@ public interface AppointmentJpaRepository extends JpaRepository<AppointmentEntit
         @Param("startOfDay") LocalDateTime startOfDay,
         @Param("endOfDay") LocalDateTime endOfDay
     );
+
+    @Query("""
+        SELECT a FROM AppointmentEntity a
+        WHERE a.statusId = :approvedStatusId
+          AND a.scheduledStartAt >= :fromTime
+          AND a.scheduledStartAt <= :toTime
+        ORDER BY a.scheduledStartAt ASC
+    """)
+    List<AppointmentEntity> findUpcomingApproved(
+        @Param("approvedStatusId") Short approvedStatusId,
+        @Param("fromTime") LocalDateTime fromTime,
+        @Param("toTime") LocalDateTime toTime
+    );
+
+    @Query("""
+        SELECT a FROM AppointmentEntity a
+        WHERE a.scheduledStartAt >= :startOfDay AND a.scheduledStartAt < :endOfDay
+    """)
+    List<AppointmentEntity> findForDate(
+        @Param("startOfDay") LocalDateTime startOfDay,
+        @Param("endOfDay") LocalDateTime endOfDay
+    );
 }
+

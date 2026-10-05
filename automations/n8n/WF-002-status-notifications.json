@@ -1,0 +1,280 @@
+{
+  "name": "WF-002 - FCV Citas Notificación por Cambio de Estado",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "appointment-status-changed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "a1111111-2222-3333-4444-555555555555",
+      "name": "Webhook Trigger (Cambio de Estado)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "APPOINTMENT_APPROVED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Aprobada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "APPOINTMENT_REJECTED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rechazada"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.eventType }}",
+                    "rightValue": "APPOINTMENT_CANCELLED",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cancelada"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "b2222222-3333-4444-5555-666666666666",
+      "name": "Ramificar por Tipo de Evento",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.patientEmail || 'paciente@fcv.test' }}",
+        "subject": "FCV Citas - Tu cita médica ha sido APROBADA",
+        "message": "={{ '¡Buenas noticias! Tu cita médica (ID: #' + $json.aggregateId + ') ha sido confirmada y aprobada exitosamente por el equipo médico de la FCV.' }}"
+      },
+      "id": "c3333333-4444-5555-6666-777777777777",
+      "name": "Notificar Aprobación por Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.patientEmail || 'paciente@fcv.test' }}",
+        "subject": "FCV Citas - Notificación sobre tu solicitud de cita",
+        "message": "={{ 'Estimado(a) paciente, le informamos que su solicitud de cita especializada (ID: #' + $json.aggregateId + ') no pudo ser aprobada.\n\nMotivo administrativo (RN-04): ' + ($json.reason || 'Consulte en el portal FCV') }}"
+      },
+      "id": "d4444444-5555-6666-7777-888888888888",
+      "name": "Notificar Rechazo por Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.patientEmail || 'paciente@fcv.test' }}",
+        "subject": "FCV Citas - Confirmación de Cancelación de Cita",
+        "message": "={{ 'Su cita médica (ID: #' + $json.aggregateId + ') ha sido cancelada. Los horarios correspondientes han sido liberados en el sistema.' }}"
+      },
+      "id": "e5555555-6666-7777-8888-999999999999",
+      "name": "Notificar Cancelación por Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://citas-api-dev:8080/api/integrations/events/' + $json.id + '/ack' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Integration-Key",
+              "value": "={{ $env.FCV_INTEGRATION_KEY || 'fcv-n8n-integration-secret-key-2026' }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f6666666-7777-8888-9999-000000000000",
+      "name": "Confirmar Evento Procesado (Ack)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'PROCESSED', eventType: $json.eventType, aggregateId: $json.aggregateId, timestamp: new Date().toISOString() }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "g7777777-8888-9999-0000-111111111111",
+      "name": "Responder al Webhook (200 OK)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger (Cambio de Estado)": {
+      "main": [
+        [
+          {
+            "node": "Ramificar por Tipo de Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ramificar por Tipo de Evento": {
+      "main": [
+        [
+          {
+            "node": "Notificar Aprobación por Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notificar Rechazo por Email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notificar Cancelación por Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificar Aprobación por Email": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Evento Procesado (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificar Rechazo por Email": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Evento Procesado (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notificar Cancelación por Email": {
+      "main": [
+        [
+          {
+            "node": "Confirmar Evento Procesado (Ack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmar Evento Procesado (Ack)": {
+      "main": [
+        [
+          {
+            "node": "Responder al Webhook (200 OK)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fcv-s6-wf002-v1",
+  "id": "fcv-wf-002-status-notifications"
+}
