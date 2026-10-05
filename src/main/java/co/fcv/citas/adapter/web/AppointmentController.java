@@ -169,6 +169,52 @@ public class AppointmentController {
         return ResponseEntity.ok(toResponse(app));
     }
 
+    public record RescheduleRequest(
+            @NotNull @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime newStartAt,
+            @NotBlank String reason
+    ) {}
+
+    @PostMapping("/appointments/{id}/reschedule")
+    public ResponseEntity<AppointmentReschedule> reschedule(
+            @PathVariable Long id,
+            @Valid @RequestBody RescheduleRequest req,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        AppointmentReschedule res = facade.requestReschedule(new SchedulingService.RequestRescheduleCommand(
+                id, userId, req.newStartAt(), req.reason(), isAdmin
+        ));
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
+    }
+
+    @GetMapping("/admin/reschedules/pending")
+    public ResponseEntity<List<AppointmentReschedule>> listPendingReschedules() {
+        return ResponseEntity.ok(facade.listPendingReschedules());
+    }
+
+    @PatchMapping("/admin/reschedules/{id}/approve")
+    public ResponseEntity<AppointmentReschedule> approveReschedule(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long adminUserId = Long.valueOf(jwt.getSubject());
+        return ResponseEntity.ok(facade.approveReschedule(id, adminUserId));
+    }
+
+    public record RejectRescheduleRequest(@NotBlank String rejectionReason) {}
+
+    @PatchMapping("/admin/reschedules/{id}/reject")
+    public ResponseEntity<AppointmentReschedule> rejectReschedule(
+            @PathVariable Long id,
+            @Valid @RequestBody RejectRescheduleRequest req,
+            @AuthenticationPrincipal Jwt jwt
+    ) {
+        Long adminUserId = Long.valueOf(jwt.getSubject());
+        return ResponseEntity.ok(facade.rejectReschedule(id, req.rejectionReason(), adminUserId));
+    }
+
     // --- Profesional ---
 
     @GetMapping("/professional/appointments")

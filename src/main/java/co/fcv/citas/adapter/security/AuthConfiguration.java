@@ -18,8 +18,9 @@ public class AuthConfiguration {
         };
     }
     @Bean AuthService authService(AuthPorts.Users users, AuthPorts.Sessions sessions, AuthPorts.Passwords passwords,
-                                 AuthPorts.Tokens tokens, Clock clock, @Value("${app.jwt.refresh-days}") long days) {
+                                 AuthPorts.Tokens tokens, AuthPorts.PasswordResetTokens passwordResetTokens,
+                                 Clock clock, @Value("${app.jwt.refresh-days}") long days) {
         if (days < 1 || days > 30) throw new IllegalArgumentException("JWT_REFRESH_DAYS debe estar entre 1 y 30.");
-        return new AuthService(users, sessions, passwords, tokens, clock, Duration.ofDays(days));
+        return new AuthService(users, sessions, passwords, tokens, passwordResetTokens, clock, Duration.ofDays(days));
     }
 }

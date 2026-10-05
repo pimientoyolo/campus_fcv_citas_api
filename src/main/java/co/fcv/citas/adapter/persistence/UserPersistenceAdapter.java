@@ -24,6 +24,22 @@ public class UserPersistenceAdapter implements AuthPorts.Users {
             throw new AuthFailure(AuthFailure.Kind.DUPLICATE, "El correo o documento ya están registrados.");
         }
     }
+
+    public User update(User user) {
+        UserEntity entity = repository.findById(user.id())
+                .orElseThrow(() -> new AuthFailure(AuthFailure.Kind.INVALID, "Usuario no encontrado."));
+        entity.firstName = user.firstName();
+        entity.lastName = user.lastName();
+        entity.phone = user.phone();
+        return map(repository.saveAndFlush(entity));
+    }
+
+    public void updatePasswordHash(Long userId, String passwordHash) {
+        UserEntity entity = repository.findById(userId)
+                .orElseThrow(() -> new AuthFailure(AuthFailure.Kind.INVALID, "Usuario no encontrado."));
+        entity.passwordHash = passwordHash;
+        repository.saveAndFlush(entity);
+    }
     private User map(UserEntity e) {
         return new User(e.id, e.firstName, e.lastName, e.documentType, e.documentNumber,
                 e.email, e.phone, e.passwordHash, e.active, e.roles);

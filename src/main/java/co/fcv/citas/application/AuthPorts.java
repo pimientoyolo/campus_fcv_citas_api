@@ -11,12 +11,20 @@ public final class AuthPorts {
         Optional<User> byEmail(String email);
         Optional<User> byId(Long id);
         User create(User user);
+        User update(User user);
+        void updatePasswordHash(Long userId, String passwordHash);
     }
     public interface Sessions {
         void create(AuthSession session);
         Optional<AuthSession> byId(String id);
         boolean rotate(String sessionId, String oldRefreshId, String newRefreshId, Instant now);
         void revoke(String id, Long userId);
+        void revokeAllForUser(Long userId);
+    }
+    public interface PasswordResetTokens {
+        void save(co.fcv.citas.domain.PasswordResetToken token);
+        Optional<co.fcv.citas.domain.PasswordResetToken> byTokenHash(String tokenHash);
+        void markUsed(Long id, Instant usedAt);
     }
     public interface Passwords {
         String hash(String raw);

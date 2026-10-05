@@ -11,13 +11,22 @@ public class CatalogPersistenceAdapter implements SchedulingPorts.Catalogs {
     private final LocationJpaRepository locations;
     private final SpecialtyJpaRepository specialties;
     private final AppointmentStatusJpaRepository statuses;
+    private final RegimenJpaRepository regimens;
+    private final EpsJpaRepository epsList;
+    private final EpsPlanJpaRepository epsPlans;
 
     public CatalogPersistenceAdapter(LocationJpaRepository locations,
                                      SpecialtyJpaRepository specialties,
-                                     AppointmentStatusJpaRepository statuses) {
+                                     AppointmentStatusJpaRepository statuses,
+                                     RegimenJpaRepository regimens,
+                                     EpsJpaRepository epsList,
+                                     EpsPlanJpaRepository epsPlans) {
         this.locations = locations;
         this.specialties = specialties;
         this.statuses = statuses;
+        this.regimens = regimens;
+        this.epsList = epsList;
+        this.epsPlans = epsPlans;
     }
 
     public List<Location> findAllLocations() {
@@ -46,6 +55,57 @@ public class CatalogPersistenceAdapter implements SchedulingPorts.Catalogs {
 
     public Optional<AppointmentStatus> findStatusByCode(String code) {
         return statuses.findByCode(code).map(this::map);
+    }
+
+    public Specialty saveSpecialty(Specialty s) {
+        SpecialtyEntity e = s.id() != null ? specialties.findById(s.id()).orElseGet(SpecialtyEntity::new) : new SpecialtyEntity();
+        e.code = s.code();
+        e.name = s.name();
+        e.appointmentDurationMinutes = (short) s.durationMinutes();
+        e.isGeneral = s.isGeneral();
+        e.requiresAdminApproval = s.requiresAdminApproval();
+        e.active = s.active();
+        return map(specialties.saveAndFlush(e));
+    }
+
+    public List<Regimen> findAllRegimens() {
+        return regimens.findAll().stream().map(r -> new Regimen(r.id, r.code, r.name, r.active)).toList();
+    }
+
+    public List<Eps> findAllEps() {
+        return epsList.findAll().stream().map(e -> new Eps(e.id, e.code, e.name, e.active)).toList();
+    }
+
+    public Optional<Eps> findEpsById(Short id) {
+        return epsList.findById(id).map(e -> new Eps(e.id, e.code, e.name, e.active));
+    }
+
+    public Eps saveEps(Eps eps) {
+        EpsEntity e = eps.id() != null ? epsList.findById(eps.id()).orElseGet(EpsEntity::new) : new EpsEntity();
+        e.code = eps.code();
+        e.name = eps.name();
+        e.active = eps.active();
+        EpsEntity saved = epsList.saveAndFlush(e);
+        return new Eps(saved.id, saved.code, saved.name, saved.active);
+    }
+
+    public List<EpsPlan> findPlansByEpsId(Short epsId) {
+        return epsPlans.findByEpsId(epsId).stream()
+                .map(p -> new EpsPlan(p.id, p.epsId, p.code, p.name, p.active)).toList();
+    }
+
+    public Optional<EpsPlan> findPlanById(Short id) {
+        return epsPlans.findById(id).map(p -> new EpsPlan(p.id, p.epsId, p.code, p.name, p.active));
+    }
+
+    public EpsPlan savePlan(EpsPlan plan) {
+        EpsPlanEntity e = plan.id() != null ? epsPlans.findById(plan.id()).orElseGet(EpsPlanEntity::new) : new EpsPlanEntity();
+        e.epsId = plan.epsId();
+        e.code = plan.code();
+        e.name = plan.name();
+        e.active = plan.active();
+        EpsPlanEntity saved = epsPlans.saveAndFlush(e);
+        return new EpsPlan(saved.id, saved.epsId, saved.code, saved.name, saved.active);
     }
 
     private Location map(LocationEntity e) {

@@ -30,4 +30,19 @@ public class CatalogController {
     public ResponseEntity<List<AppointmentStatus>> getStatuses() {
         return ResponseEntity.ok(facade.getAppointmentStatuses());
     }
+
+    @GetMapping("/regimens")
+    public ResponseEntity<List<co.fcv.citas.domain.Regimen>> getRegimens() {
+        return ResponseEntity.ok(facade.getRegimens());
+    }
+
+    @GetMapping("/eps")
+    public ResponseEntity<List<co.fcv.citas.domain.Eps>> getEpsList() {
+        return ResponseEntity.ok(facade.getEpsList());
+    }
+
+    @GetMapping("/eps/{id}/plans")
+    public ResponseEntity<List<co.fcv.citas.domain.EpsPlan>> getEpsPlans(@PathVariable Short id) {
+        return ResponseEntity.ok(facade.getEpsPlans(id));
+    }
 }

@@ -12,4 +12,8 @@ public interface SessionJpaRepository extends JpaRepository<SessionEntity, Strin
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update SessionEntity s set s.revoked = true where s.id = :id and s.userId = :userId")
     int revoke(@Param("id") String id, @Param("userId") Long userId);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update SessionEntity s set s.revoked = true where s.userId = :userId")
+    int revokeAllByUserId(@Param("userId") Long userId);
 }

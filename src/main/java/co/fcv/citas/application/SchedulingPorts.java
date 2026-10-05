@@ -14,9 +14,17 @@ public final class SchedulingPorts {
         Optional<Location> findLocationById(Short id);
         List<Specialty> findAllSpecialties();
         Optional<Specialty> findSpecialtyById(Short id);
+        Specialty saveSpecialty(Specialty specialty);
         List<AppointmentStatus> findAllAppointmentStatuses();
         Optional<AppointmentStatus> findStatusById(Short id);
         Optional<AppointmentStatus> findStatusByCode(String code);
+        List<Regimen> findAllRegimens();
+        List<Eps> findAllEps();
+        Optional<Eps> findEpsById(Short id);
+        Eps saveEps(Eps eps);
+        List<EpsPlan> findPlansByEpsId(Short epsId);
+        Optional<EpsPlan> findPlanById(Short id);
+        EpsPlan savePlan(EpsPlan plan);
     }
 
     public interface Professionals {
@@ -56,5 +64,19 @@ public final class SchedulingPorts {
     public interface AppointmentHistories {
         void record(AppointmentStatusHistory history);
         List<AppointmentStatusHistory> findByAppointmentId(Long appointmentId);
+    }
+
+    public interface Affiliations {
+        List<UserAffiliation> findByUserId(Long userId);
+        Optional<UserAffiliation> findExisting(Long userId, Short epsId, Short epsPlanId, Short regimenId);
+        UserAffiliation save(UserAffiliation affiliation);
+        void deactivate(Long id);
+    }
+
+    public interface Reschedules {
+        AppointmentReschedule save(AppointmentReschedule reschedule);
+        Optional<AppointmentReschedule> findById(Long id);
+        List<AppointmentReschedule> findByAppointmentId(Long appointmentId);
+        List<AppointmentReschedule> findByStatusId(Short statusId);
     }
 }

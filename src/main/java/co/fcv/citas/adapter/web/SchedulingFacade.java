@@ -25,6 +25,24 @@ public class SchedulingFacade {
     public List<AppointmentStatus> getAppointmentStatuses() { return service.getAppointmentStatuses(); }
 
     @Transactional(readOnly = true)
+    public List<Regimen> getRegimens() { return service.getRegimens(); }
+
+    @Transactional(readOnly = true)
+    public List<Eps> getEpsList() { return service.getEpsList(); }
+
+    @Transactional(readOnly = true)
+    public List<EpsPlan> getEpsPlans(Short epsId) { return service.getEpsPlans(epsId); }
+
+    @Transactional
+    public Eps saveEps(Eps eps) { return service.saveEps(eps); }
+
+    @Transactional
+    public EpsPlan saveEpsPlan(EpsPlan plan) { return service.saveEpsPlan(plan); }
+
+    @Transactional
+    public Specialty saveSpecialty(Specialty specialty) { return service.saveSpecialty(specialty); }
+
+    @Transactional(readOnly = true)
     public List<Professional> listProfessionals(Boolean active, Short specialtyId, Short locationId) {
         return service.listProfessionals(active, specialtyId, locationId);
     }
@@ -114,5 +132,40 @@ public class SchedulingFacade {
     @Transactional(readOnly = true)
     public List<AppointmentStatusHistory> getAppointmentHistory(Long appointmentId, Long userId, boolean isAdmin) {
         return service.getAppointmentHistory(appointmentId, userId, isAdmin);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserAffiliation> getUserAffiliations(Long userId) {
+        return service.getUserAffiliations(userId);
+    }
+
+    @Transactional
+    public UserAffiliation createAffiliation(SchedulingService.CreateAffiliationCommand cmd) {
+        return service.createAffiliation(cmd);
+    }
+
+    @Transactional
+    public void deactivateAffiliation(Long affiliationId) {
+        service.deactivateAffiliation(affiliationId);
+    }
+
+    @Transactional
+    public AppointmentReschedule requestReschedule(SchedulingService.RequestRescheduleCommand cmd) {
+        return service.requestReschedule(cmd);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppointmentReschedule> listPendingReschedules() {
+        return service.listPendingReschedules();
+    }
+
+    @Transactional
+    public AppointmentReschedule approveReschedule(Long rescheduleId, Long adminUserId) {
+        return service.approveReschedule(rescheduleId, adminUserId);
+    }
+
+    @Transactional
+    public AppointmentReschedule rejectReschedule(Long rescheduleId, String rejectionReason, Long adminUserId) {
+        return service.rejectReschedule(rescheduleId, rejectionReason, adminUserId);
     }
 }

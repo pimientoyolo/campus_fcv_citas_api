@@ -5,6 +5,7 @@ import co.fcv.citas.domain.User;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -16,14 +17,21 @@ public final class AuthService {
     private final Sessions sessions;
     private final Passwords passwords;
     private final Tokens tokens;
+    private final PasswordResetTokens passwordResetTokens;
     private final Clock clock;
     private final Duration refreshLifetime;
     private final String dummyHash;
 
     public AuthService(Users users, Sessions sessions, Passwords passwords, Tokens tokens,
                        Clock clock, Duration refreshLifetime) {
+        this(users, sessions, passwords, tokens, null, clock, refreshLifetime);
+    }
+
+    public AuthService(Users users, Sessions sessions, Passwords passwords, Tokens tokens,
+                       PasswordResetTokens passwordResetTokens, Clock clock, Duration refreshLifetime) {
         this.users = users; this.sessions = sessions; this.passwords = passwords;
-        this.tokens = tokens; this.clock = clock; this.refreshLifetime = refreshLifetime;
+        this.tokens = tokens; this.passwordResetTokens = passwordResetTokens;
+        this.clock = clock; this.refreshLifetime = refreshLifetime;
         this.dummyHash = passwords.hash(UUID.randomUUID().toString());
     }
 
@@ -71,5 +79,83 @@ public final class AuthService {
     }
 
     public void logout(Long userId, String sessionId) { sessions.revoke(sessionId, userId); }
+
+    public record RequestResetResult(String message, String resetToken) {}
+
+    public RequestResetResult requestPasswordReset(String rawEmail) {
+        String email = normalizeEmail(rawEmail);
+        var optUser = users.byEmail(email);
+        if (optUser.isEmpty()) {
+            return new RequestResetResult("Si el correo está registrado, se procesará la solicitud.", null);
+        }
+        User user = optUser.get();
+        String rawToken = UUID.randomUUID().toString().replace("-", "");
+        String tokenHash = hashToken(rawToken);
+        Instant expiresAt = clock.instant().plus(Duration.ofHours(1));
+        if (passwordResetTokens != null) {
+            passwordResetTokens.save(new co.fcv.citas.domain.PasswordResetToken(null, user.id(), tokenHash, expiresAt, null, clock.instant()));
+        }
+        return new RequestResetResult("Si el correo está registrado, se procesará la solicitud.", rawToken);
+    }
+
+    public void confirmPasswordReset(String rawToken, String newPassword) {
+        int bytes = newPassword.getBytes(StandardCharsets.UTF_8).length;
+        if (newPassword.length() < 8 || bytes > 72) {
+            throw new AuthFailure(AuthFailure.Kind.INVALID, "La contraseña requiere mínimo 8 caracteres y máximo 72 bytes UTF-8.");
+        }
+        if (passwordResetTokens == null) {
+            throw new AuthFailure(AuthFailure.Kind.INVALID, "Servicio de recuperación no disponible.");
+        }
+        String tokenHash = hashToken(rawToken);
+        var token = passwordResetTokens.byTokenHash(tokenHash)
+                .orElseThrow(() -> new AuthFailure(AuthFailure.Kind.INVALID, "Token de recuperación inválido o inexistente."));
+
+        if (!token.isValid(clock.instant())) {
+            throw new AuthFailure(AuthFailure.Kind.INVALID, "El token de recuperación ha expirado o ya fue utilizado.");
+        }
+
+        String newHash = passwords.hash(newPassword);
+        users.updatePasswordHash(token.userId(), newHash);
+        passwordResetTokens.markUsed(token.id(), clock.instant());
+        sessions.revokeAllForUser(token.userId());
+    }
+
+    public record UpdateProfileCommand(String firstName, String lastName, String phone) {}
+
+    public User updateProfile(Long userId, UpdateProfileCommand cmd) {
+        User existing = users.byId(userId).orElseThrow(AuthFailure::unauthorized);
+        User updated = new User(
+                existing.id(),
+                cmd.firstName() != null ? cmd.firstName().strip() : existing.firstName(),
+                cmd.lastName() != null ? cmd.lastName().strip() : existing.lastName(),
+                existing.documentType(),
+                existing.documentNumber(),
+                existing.email(),
+                cmd.phone() != null ? cmd.phone().strip() : existing.phone(),
+                existing.passwordHash(),
+                existing.active(),
+                existing.roles()
+        );
+        return users.update(updated);
+    }
+
+    public User getUserProfile(Long userId) {
+        return users.byId(userId).filter(User::active).orElseThrow(AuthFailure::unauthorized);
+    }
+
+    private static String hashToken(String raw) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private String normalizeEmail(String email) { return email.strip().toLowerCase(Locale.ROOT); }
 }

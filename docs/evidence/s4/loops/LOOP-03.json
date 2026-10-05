@@ -1,0 +1,22 @@
+{
+  "goal": "implementar restablecimiento seguro de contraseña (RF-03) y catálogos configurables por ADMIN (RF-06)",
+  "scenario": "Usuario restablece clave mediante token de un solo uso con revocación de sesiones, y Administrador gestiona EPS/Planes/Especialidades",
+  "iterations": [
+    {
+      "iteration": 1,
+      "builder": "Creada migración Flyway V4 para password_reset_tokens y endpoints en AuthController. Creación de AdminCatalogController con operaciones CRUD.",
+      "backendTests": "FAIL - Los tokens en texto plano podían ser vulnerables si la base de datos se filtraba, y el borrado físico de catálogos podía romper integridad referencial.",
+      "verifier": "FAIL",
+      "findings": "El token debe almacenarse con hash criptográfico SHA-256 en base de datos y los catálogos deben soportar borrado lógico / desactivación (active: false)."
+    },
+    {
+      "iteration": 2,
+      "builder": "Almacenamiento de hash SHA-256 en PasswordResetTokenEntity, expiración de 1 hora, consumo de un solo uso (used_at) y revocación atómica de sesiones activas (SessionJpaRepository.revokeAllByUserId). Endpoints de toggle active para EPS, planes y especialidades.",
+      "backendTests": "PASS - S4FeaturesIntegrationTest: passwordResetFlowWorksEndToEnd y adminCatalogCrud superados al 100%.",
+      "verifier": "PASS",
+      "findings": "Restablecimiento de clave y catálogos configurables completamente operativos y seguros."
+    }
+  ],
+  "result": "COMPLETED",
+  "finalVerifier": "PASS"
+}

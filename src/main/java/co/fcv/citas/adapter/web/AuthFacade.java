@@ -14,4 +14,8 @@ public class AuthFacade {
     @Transactional public AuthService.Login refresh(String token) { return service.refresh(token); }
     @Transactional(readOnly = true) public User identity(Long userId, String sessionId) { return service.identity(userId, sessionId); }
     @Transactional public void logout(Long userId, String sessionId) { service.logout(userId, sessionId); }
+    @Transactional public AuthService.RequestResetResult requestPasswordReset(String email) { return service.requestPasswordReset(email); }
+    @Transactional public void confirmPasswordReset(String token, String newPassword) { service.confirmPasswordReset(token, newPassword); }
+    @Transactional public User updateProfile(Long userId, AuthService.UpdateProfileCommand cmd) { return service.updateProfile(userId, cmd); }
+    @Transactional(readOnly = true) public User getUserProfile(Long userId) { return service.getUserProfile(userId); }
 }

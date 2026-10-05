@@ -1,0 +1,22 @@
+{
+  "goal": "implementar flujo de reprogramación de citas (RF-15, RF-18) y afiliación de pacientes (RF-04)",
+  "scenario": "Paciente solicita reprogramación de turno en estado no-terminal y asocia su EPS/Plan sin permitir duplicados",
+  "iterations": [
+    {
+      "iteration": 1,
+      "builder": "Diseñadas migraciones Flyway V5 (afiliaciones, EPS, planes, regímenes) y V6 (reprogramaciones). Creados puertos SchedulingPorts.Affiliations y SchedulingPorts.Reschedules.",
+      "backendTests": "FAIL - Inicialmente se requería verificar que un paciente no pueda duplicar una afiliación activa idéntica ni reprogramar turnos en el pasado.",
+      "verifier": "FAIL",
+      "findings": "Se requiere validación de slot disponible para la reprogramación y control de unicidad de afiliación activa."
+    },
+    {
+      "iteration": 2,
+      "builder": "Implementado SchedulingService.createAffiliation con chequeo de afiliación activa previa (409 CONFLICT) y SchedulingService.requestReschedule/approveReschedule con reasignación atómica de slots y registro de historial de estado.",
+      "backendTests": "PASS - S4FeaturesIntegrationTest: profileAndAffiliationManagement y appointmentRescheduleFlow superados al 100%.",
+      "verifier": "PASS",
+      "findings": "Flujo de reprogramación y afiliación integrado con éxito en arquitectura hexagonal."
+    }
+  ],
+  "result": "COMPLETED",
+  "finalVerifier": "PASS"
+}

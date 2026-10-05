@@ -18,6 +18,8 @@ public class SchedulingService {
     private final AppointmentHistories histories;
     private final AuthPorts.Users users;
     private final AuthPorts.Passwords passwords;
+    private final Affiliations affiliations;
+    private final Reschedules reschedules;
     private final Clock clock;
 
     public SchedulingService(Catalogs catalogs, Professionals professionals,
@@ -28,6 +30,19 @@ public class SchedulingService {
                              AuthPorts.Users users,
                              AuthPorts.Passwords passwords,
                              Clock clock) {
+        this(catalogs, professionals, availabilityBlocks, professionalSlots, appointments, histories, users, passwords, null, null, clock);
+    }
+
+    public SchedulingService(Catalogs catalogs, Professionals professionals,
+                             AvailabilityBlocks availabilityBlocks,
+                             ProfessionalSlots professionalSlots,
+                             Appointments appointments,
+                             AppointmentHistories histories,
+                             AuthPorts.Users users,
+                             AuthPorts.Passwords passwords,
+                             Affiliations affiliations,
+                             Reschedules reschedules,
+                             Clock clock) {
         this.catalogs = catalogs;
         this.professionals = professionals;
         this.availabilityBlocks = availabilityBlocks;
@@ -36,6 +51,8 @@ public class SchedulingService {
         this.histories = histories;
         this.users = users;
         this.passwords = passwords;
+        this.affiliations = affiliations;
+        this.reschedules = reschedules;
         this.clock = clock;
     }
 
@@ -43,6 +60,12 @@ public class SchedulingService {
     public List<Location> getLocations() { return catalogs.findAllLocations(); }
     public List<Specialty> getSpecialties() { return catalogs.findAllSpecialties(); }
     public List<AppointmentStatus> getAppointmentStatuses() { return catalogs.findAllAppointmentStatuses(); }
+    public List<Regimen> getRegimens() { return catalogs.findAllRegimens(); }
+    public List<Eps> getEpsList() { return catalogs.findAllEps(); }
+    public List<EpsPlan> getEpsPlans(Short epsId) { return catalogs.findPlansByEpsId(epsId); }
+    public Eps saveEps(Eps eps) { return catalogs.saveEps(eps); }
+    public EpsPlan saveEpsPlan(EpsPlan plan) { return catalogs.savePlan(plan); }
+    public Specialty saveSpecialty(Specialty specialty) { return catalogs.saveSpecialty(specialty); }
 
     // --- Profesionales ---
     public record CreateProfessionalCommand(
@@ -480,5 +503,121 @@ public class SchedulingService {
         }
 
         return histories.findByAppointmentId(appointmentId);
+    }
+
+    // --- Afiliaciones de Pacientes (RF-04) ---
+    public record CreateAffiliationCommand(Long userId, Short epsId, Short epsPlanId, Short regimenId) {}
+
+    public List<UserAffiliation> getUserAffiliations(Long userId) {
+        if (affiliations == null) return List.of();
+        return affiliations.findByUserId(userId);
+    }
+
+    public UserAffiliation createAffiliation(CreateAffiliationCommand cmd) {
+        if (affiliations == null) throw SchedulingFailure.invalid("Módulo de afiliación no disponible.");
+        var existing = affiliations.findExisting(cmd.userId(), cmd.epsId(), cmd.epsPlanId(), cmd.regimenId());
+        if (existing.isPresent() && existing.get().active()) {
+            throw SchedulingFailure.conflict("Ya existe una afiliación activa con la misma EPS, plan y régimen para este usuario.");
+        }
+        return affiliations.save(new UserAffiliation(
+                null, cmd.userId(), cmd.epsId(), null, cmd.epsPlanId(), null, cmd.regimenId(), null, true, clock.instant()
+        ));
+    }
+
+    public void deactivateAffiliation(Long affiliationId) {
+        if (affiliations != null) {
+            affiliations.deactivate(affiliationId);
+        }
+    }
+
+    // --- Reprogramación de Citas (RF-15, RF-18) ---
+    public record RequestRescheduleCommand(Long appointmentId, Long userId, LocalDateTime newStartAt, String reason, boolean isAdmin) {}
+
+    public AppointmentReschedule requestReschedule(RequestRescheduleCommand cmd) {
+        if (reschedules == null) throw SchedulingFailure.invalid("Módulo de reprogramación no disponible.");
+        Appointment app = appointments.findById(cmd.appointmentId())
+                .orElseThrow(() -> SchedulingFailure.notFound("Cita no encontrada."));
+        if (!cmd.isAdmin() && !app.patientUserId().equals(cmd.userId())) {
+            throw SchedulingFailure.forbidden("No tiene permiso para reprogramar esta cita.");
+        }
+        if (app.statusId() == 3 || app.statusId() == 4 || app.statusId() == 5 || app.statusId() == 6) {
+            throw SchedulingFailure.invalid("No se puede reprogramar una cita en estado terminal.");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (cmd.newStartAt().isBefore(now)) {
+            throw SchedulingFailure.invalid("La nueva fecha debe ser en el futuro.");
+        }
+        Specialty specialty = catalogs.findSpecialtyById(app.specialtyId())
+                .orElseThrow(() -> SchedulingFailure.notFound("Especialidad no encontrada."));
+        LocalDateTime newEndAt = cmd.newStartAt().plusMinutes(specialty.durationMinutes());
+
+        List<ProfessionalSlot> targetSlots = professionalSlots.findSlotsForRange(app.professionalId(), cmd.newStartAt(), newEndAt);
+        int requiredSlots = specialty.durationMinutes() / 30;
+        if (targetSlots.size() < requiredSlots || targetSlots.stream().anyMatch(s -> !s.isAvailable())) {
+            throw SchedulingFailure.conflict("El horario seleccionado para reprogramar no se encuentra disponible.");
+        }
+
+        if (cmd.isAdmin()) {
+            professionalSlots.releaseSlots(app.id());
+            List<Long> slotIds = targetSlots.stream().map(ProfessionalSlot::id).toList();
+            professionalSlots.assignSlots(slotIds, app.id());
+            appointments.save(new Appointment(app.id(), app.patientUserId(), app.professionalId(),
+                    app.locationId(), app.specialtyId(), app.statusId(), cmd.newStartAt(), newEndAt,
+                    app.rejectionReason(), app.createdAt(), clock.instant()));
+            histories.record(new AppointmentStatusHistory(null, app.id(), app.statusId(), cmd.userId(), "ADMIN", clock.instant(), "Reprogramada por administración: " + cmd.reason()));
+            return reschedules.save(new AppointmentReschedule(null, app.id(), cmd.userId(), app.scheduledStartAt(), cmd.newStartAt(), newEndAt, (short) 2, "APPROVED", cmd.reason(), null, clock.instant(), clock.instant()));
+        }
+
+        return reschedules.save(new AppointmentReschedule(null, app.id(), cmd.userId(), app.scheduledStartAt(), cmd.newStartAt(), newEndAt, (short) 1, "PENDING", cmd.reason(), null, clock.instant(), clock.instant()));
+    }
+
+    public List<AppointmentReschedule> listPendingReschedules() {
+        if (reschedules == null) return List.of();
+        return reschedules.findByStatusId((short) 1);
+    }
+
+    public AppointmentReschedule approveReschedule(Long rescheduleId, Long adminUserId) {
+        if (reschedules == null) throw SchedulingFailure.invalid("Módulo de reprogramación no disponible.");
+        AppointmentReschedule res = reschedules.findById(rescheduleId)
+                .orElseThrow(() -> SchedulingFailure.notFound("Solicitud de reprogramación no encontrada."));
+        if (res.statusId() != 1) {
+            throw SchedulingFailure.invalid("La solicitud ya fue procesada.");
+        }
+        Appointment app = appointments.findById(res.appointmentId())
+                .orElseThrow(() -> SchedulingFailure.notFound("Cita no encontrada."));
+        Specialty specialty = catalogs.findSpecialtyById(app.specialtyId())
+                .orElseThrow(() -> SchedulingFailure.notFound("Especialidad no encontrada."));
+        List<ProfessionalSlot> targetSlots = professionalSlots.findSlotsForRange(app.professionalId(), res.newStartAt(), res.newEndAt());
+        int requiredSlots = specialty.durationMinutes() / 30;
+        if (targetSlots.size() < requiredSlots || targetSlots.stream().anyMatch(s -> !s.isAvailable())) {
+            throw SchedulingFailure.conflict("Los turnos para reprogramar ya no se encuentran disponibles.");
+        }
+
+        professionalSlots.releaseSlots(app.id());
+        List<Long> slotIds = targetSlots.stream().map(ProfessionalSlot::id).toList();
+        int assigned = professionalSlots.assignSlots(slotIds, app.id());
+        if (assigned < slotIds.size()) {
+            throw SchedulingFailure.conflict("Conflicto al asignar los nuevos turnos.");
+        }
+
+        appointments.save(new Appointment(app.id(), app.patientUserId(), app.professionalId(),
+                app.locationId(), app.specialtyId(), (short) 2, res.newStartAt(), res.newEndAt(),
+                null, app.createdAt(), clock.instant()));
+        histories.record(new AppointmentStatusHistory(null, app.id(), (short) 2, adminUserId, "ADMIN", clock.instant(), "Reprogramación aprobada: " + res.reason()));
+
+        return reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 2, "APPROVED", res.reason(), null, res.createdAt(), clock.instant()));
+    }
+
+    public AppointmentReschedule rejectReschedule(Long rescheduleId, String rejectionReason, Long adminUserId) {
+        if (reschedules == null) throw SchedulingFailure.invalid("Módulo de reprogramación no disponible.");
+        if (rejectionReason == null || rejectionReason.isBlank()) {
+            throw SchedulingFailure.invalid("El motivo de rechazo de la reprogramación es obligatorio.");
+        }
+        AppointmentReschedule res = reschedules.findById(rescheduleId)
+                .orElseThrow(() -> SchedulingFailure.notFound("Solicitud de reprogramación no encontrada."));
+        if (res.statusId() != 1) {
+            throw SchedulingFailure.invalid("La solicitud ya fue procesada.");
+        }
+        return reschedules.save(new AppointmentReschedule(res.id(), res.appointmentId(), res.requestedByUserId(), res.oldStartAt(), res.newStartAt(), res.newEndAt(), (short) 3, "REJECTED", res.reason(), rejectionReason.strip(), res.createdAt(), clock.instant()));
     }
 }

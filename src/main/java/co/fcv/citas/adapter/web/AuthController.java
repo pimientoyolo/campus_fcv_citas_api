@@ -52,4 +52,18 @@ public class AuthController {
         facade.logout(Long.valueOf(jwt.getSubject()), jwt.getClaimAsString("sid"));
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
+
+    public record PasswordResetRequestDto(@NotBlank @Email @Size(max = 254) String email) {}
+    public record PasswordResetConfirmDto(@NotBlank String token, @NotBlank @Size(min = 8, max = 72) String newPassword) {}
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<AuthService.RequestResetResult> requestReset(@Valid @RequestBody PasswordResetRequestDto req) {
+        return ResponseEntity.ok(facade.requestPasswordReset(req.email()));
+    }
+
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<java.util.Map<String, String>> confirmReset(@Valid @RequestBody PasswordResetConfirmDto req) {
+        facade.confirmPasswordReset(req.token(), req.newPassword());
+        return ResponseEntity.ok(java.util.Map.of("message", "Contraseña actualizada exitosamente. Inicie sesión con su nueva clave."));
+    }
 }

@@ -22,4 +22,5 @@ public class SessionPersistenceAdapter implements AuthPorts.Sessions {
         return repository.rotate(id, old, next, now) == 1;
     }
     public void revoke(String id, Long userId) { repository.revoke(id, userId); }
+    public void revokeAllForUser(Long userId) { repository.revokeAllByUserId(userId); }
 }

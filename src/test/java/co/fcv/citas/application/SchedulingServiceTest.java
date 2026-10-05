@@ -150,6 +150,14 @@ class SchedulingServiceTest {
             if ("APPROVED".equals(code)) return Optional.of(new AppointmentStatus((short) 2, "APPROVED", "Aprobada", false));
             return Optional.empty();
         }
+        public Specialty saveSpecialty(Specialty s) { return s; }
+        public List<Regimen> findAllRegimens() { return List.of(); }
+        public List<Eps> findAllEps() { return List.of(); }
+        public Optional<Eps> findEpsById(Short id) { return Optional.empty(); }
+        public Eps saveEps(Eps eps) { return eps; }
+        public List<EpsPlan> findPlansByEpsId(Short epsId) { return List.of(); }
+        public Optional<EpsPlan> findPlanById(Short id) { return Optional.empty(); }
+        public EpsPlan savePlan(EpsPlan plan) { return plan; }
     }
 
     static class MockProfessionals implements SchedulingPorts.Professionals {
@@ -198,6 +206,8 @@ class SchedulingServiceTest {
         public Optional<User> byEmail(String email) { return Optional.empty(); }
         public Optional<User> byId(Long id) { return Optional.empty(); }
         public User create(User user) { return user; }
+        public User update(User user) { return user; }
+        public void updatePasswordHash(Long userId, String passwordHash) {}
     }
 
     static class MockPasswords implements AuthPorts.Passwords {

@@ -18,7 +18,9 @@ public class SchedulingConfiguration {
             SchedulingPorts.AppointmentHistories histories,
             co.fcv.citas.application.AuthPorts.Users users,
             co.fcv.citas.application.AuthPorts.Passwords passwords,
+            SchedulingPorts.Affiliations affiliations,
+            SchedulingPorts.Reschedules reschedules,
             Clock clock) {
-        return new SchedulingService(catalogs, professionals, blocks, slots, appointments, histories, users, passwords, clock);
+        return new SchedulingService(catalogs, professionals, blocks, slots, appointments, histories, users, passwords, affiliations, reschedules, clock);
     }
 }
