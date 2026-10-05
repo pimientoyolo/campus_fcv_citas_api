@@ -47,8 +47,8 @@ public class ProfessionalSlotPersistenceAdapter implements SchedulingPorts.Profe
         repository.saveAllAndFlush(entities);
     }
 
-    public void assignSlots(List<Long> slotIds, Long appointmentId) {
-        repository.assignSlots(slotIds, appointmentId);
+    public int assignSlots(List<Long> slotIds, Long appointmentId) {
+        return repository.assignSlots(slotIds, appointmentId);
     }
 
     public void releaseSlots(Long appointmentId) {

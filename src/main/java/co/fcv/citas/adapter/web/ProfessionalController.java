@@ -78,6 +78,48 @@ public class ProfessionalController {
         return ResponseEntity.ok(facade.getProfessional(id));
     }
 
+    public record UpdateProfessionalRequest(
+            String professionalCode,
+            String licenseNumber,
+            Boolean active,
+            List<Short> specialtyIds,
+            List<Short> locationIds
+    ) {}
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Professional> update(
+            @PathVariable Long id,
+            @RequestBody UpdateProfessionalRequest req,
+            Authentication auth
+    ) {
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Professional p = facade.updateProfessional(id, new SchedulingService.UpdateProfessionalCommand(
+                req.professionalCode(), req.licenseNumber(), req.active(), req.specialtyIds(), req.locationIds()
+        ));
+        return ResponseEntity.ok(p);
+    }
+
+    public record ToggleActiveRequest(@NotNull Boolean active) {}
+
+    @PatchMapping("/{id}/active")
+    public ResponseEntity<Professional> toggleActive(
+            @PathVariable Long id,
+            @Valid @RequestBody ToggleActiveRequest req,
+            Authentication auth
+    ) {
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        Professional p = facade.updateProfessional(id, new SchedulingService.UpdateProfessionalCommand(
+                null, null, req.active(), null, null
+        ));
+        return ResponseEntity.ok(p);
+    }
+
     @GetMapping("/{id}/blocks")
     public ResponseEntity<List<AvailabilityBlock>> getBlocks(@PathVariable Long id) {
         return ResponseEntity.ok(facade.listBlocks(id));

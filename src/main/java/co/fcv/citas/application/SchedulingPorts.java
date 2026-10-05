@@ -41,7 +41,7 @@ public final class SchedulingPorts {
         List<ProfessionalSlot> findSlotsForRange(Long professionalId, LocalDateTime startAt, LocalDateTime endAt);
         List<ProfessionalSlot> findSlotsByAppointmentId(Long appointmentId);
         void saveAll(List<ProfessionalSlot> slots);
-        void assignSlots(List<Long> slotIds, Long appointmentId);
+        int assignSlots(List<Long> slotIds, Long appointmentId);
         void releaseSlots(Long appointmentId);
     }
 

@@ -52,12 +52,17 @@ public class ProfessionalPersistenceAdapter implements SchedulingPorts.Professio
     }
 
     public Professional save(Professional p) {
-        ProfessionalEntity e = new ProfessionalEntity();
-        e.id = p.id();
-        e.userId = p.userId();
+        ProfessionalEntity e = repository.findById(p.id())
+                .orElseThrow(() -> new IllegalArgumentException("Professional not found: " + p.id()));
         e.professionalCode = p.professionalCode();
         e.licenseNumber = p.licenseNumber();
         e.active = p.active();
+        if (p.specialties() != null) {
+            e.specialties = specialtyRepository.findAllById(p.specialties().stream().map(Specialty::id).toList());
+        }
+        if (p.locations() != null) {
+            e.locations = locationRepository.findAllById(p.locations().stream().map(Location::id).toList());
+        }
         return map(repository.saveAndFlush(e));
     }
 

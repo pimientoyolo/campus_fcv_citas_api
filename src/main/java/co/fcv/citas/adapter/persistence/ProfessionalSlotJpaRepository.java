@@ -43,8 +43,8 @@ public interface ProfessionalSlotJpaRepository extends JpaRepository<Professiona
     List<ProfessionalSlotEntity> findByAppointmentId(Long appointmentId);
 
     @Modifying
-    @Query("UPDATE ProfessionalSlotEntity s SET s.appointmentId = :appointmentId WHERE s.id IN :slotIds")
-    void assignSlots(@Param("slotIds") List<Long> slotIds, @Param("appointmentId") Long appointmentId);
+    @Query("UPDATE ProfessionalSlotEntity s SET s.appointmentId = :appointmentId WHERE s.id IN :slotIds AND s.appointmentId IS NULL")
+    int assignSlots(@Param("slotIds") List<Long> slotIds, @Param("appointmentId") Long appointmentId);
 
     @Modifying
     @Query("UPDATE ProfessionalSlotEntity s SET s.appointmentId = NULL WHERE s.appointmentId = :appointmentId")

@@ -41,6 +41,11 @@ public class SchedulingFacade {
     }
 
     @Transactional
+    public Professional updateProfessional(Long id, SchedulingService.UpdateProfessionalCommand cmd) {
+        return service.updateProfessional(id, cmd);
+    }
+
+    @Transactional
     public AvailabilityBlock createBlock(SchedulingService.CreateBlockCommand cmd) {
         return service.createBlock(cmd);
     }
@@ -107,7 +112,7 @@ public class SchedulingFacade {
     }
 
     @Transactional(readOnly = true)
-    public List<AppointmentStatusHistory> getAppointmentHistory(Long appointmentId) {
-        return service.getAppointmentHistory(appointmentId);
+    public List<AppointmentStatusHistory> getAppointmentHistory(Long appointmentId, Long userId, boolean isAdmin) {
+        return service.getAppointmentHistory(appointmentId, userId, isAdmin);
     }
 }

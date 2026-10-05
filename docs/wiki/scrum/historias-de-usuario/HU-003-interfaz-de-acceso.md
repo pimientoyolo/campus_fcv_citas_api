@@ -2,7 +2,7 @@
 id: HU-003
 tipo: historia-de-usuario
 titulo: Interfaz de acceso
-estado: Pendiente de aprobación
+estado: Aprobada
 epica: "[[EP-001-acceso-de-usuarios]]"
 esfuerzo: Medio
 sprint_sugerido: S2
@@ -29,9 +29,9 @@ Mostrar errores sin revelar credenciales. Evitar doble envío. Etiquetas accesib
 Medio: interfaz, validación y comunicación REST.
 
 ## Tareas
-- [ ] T-01 (Medio): confirmar origen del diseño y framework, importar o crear interfaz según decisión.
-- [ ] T-02 (Medio): integrar formularios y estados de envío/error/éxito.
-- [ ] T-03 (Medio): verificar build, tipos y flujo en navegador.
+- [x] T-01 (Medio): confirmar origen del diseño y framework, importar o crear interfaz según decisión.
+- [x] T-02 (Medio): integrar formularios y estados de envío/error/éxito.
+- [x] T-03 (Medio): verificar build, tipos y flujo en navegador.
 
 ## Criterios de aceptación
 - CA-01: el frontend arranca y permite alternar entre login y registro mediante controles accesibles.
@@ -41,16 +41,21 @@ Medio: interfaz, validación y comunicación REST.
 - CA-05: formularios utilizables en móvil y escritorio, con etiquetas, foco visible y estado de carga.
 
 ## Definition of Done
-- [ ] CA verificados y build/typecheck correctos.
-- [ ] URL configurable y contrato REST coherente con backend.
-- [ ] Evidencia visual y procedencia real del diseño documentadas.
-- [ ] Trazabilidad actualizada; aprobación visual pendiente hasta revisión del usuario.
+- [x] CA verificados y build/typecheck correctos (`npm run build`, `npm run typecheck`).
+- [x] URL configurable (`VITE_API_URL`) y contrato REST coherente con backend.
+- [x] Evidencia visual y procedencia real del diseño documentadas en `s2-evidencia.md`.
+- [x] Trazabilidad actualizada; aprobación explícita registrada el 2026-10-04.
 
 ## Evidencia de validación
-| Elemento | Resultado | Evidencia |
-|---|---|---|
-| CA-01 a CA-05 | Pendiente | Sin ejecución al redactar |
-| DoD | Pendiente | Pendiente decisión visual e implementación |
+| Elemento | Resultado | Evidencia | Observación |
+|---|---|---|---|
+| CA-01 | Cumple | `citas-web/src/main.tsx` | Controles de navegación y switch login/registro |
+| CA-02 | Cumple | `citas-web/src/api.ts#register` | Validación y feedback de errores 400/409 |
+| CA-03 | Cumple | `citas-web/src/main.tsx` | Identidad en sesión y botón de cerrar sesión |
+| CA-04 | Cumple | `citas-web/src/api.ts` | Manejo de error de red y timeout configurable |
+| CA-05 | Cumple | `citas-web/src/styles.css` | Diseño responsive medido en 375px y escritorio |
+| DoD | Cumple | Build Vite exitoso y TypeScript validado | Transición documentada a modularización S3 |
 
 ## Historial
-S2: propuesta pendiente de aprobación del usuario.
+- 2026-09-16: Redacción inicial de la propuesta S2.
+- 2026-10-04: Aprobación explícita del usuario en plan de cierre (Aprobada / En validación para modularización).

@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "🔍 [citas-api pre-commit] Validando seguridad y pruebas..."
+
+STAGED_ENV_FILES=$(git diff --cached --name-only | grep -E '^\.env(\..+)?$' | grep -v '^\.env\.example$' || true)
+if [ -n "$STAGED_ENV_FILES" ]; then
+    echo "❌ Error: Intento de commitear archivo .env privado: $STAGED_ENV_FILES"
+    exit 1
+fi
+
+SECRET_PATTERNS='(BEGIN (RSA|EC|OPENSSH|PGP) PRIVATE KEY|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|(jwt_access_secret|jwt_refresh_secret|password)\s*[:=]\s*["'\''][^"'\'']{8,})'
+STAGED_SECRET_MATCHES=$(git diff --cached -S"SECRET" -p | grep -E -i "$SECRET_PATTERNS" || true)
+if [ -n "$STAGED_SECRET_MATCHES" ]; then
+    echo "❌ Error: Se detectaron posibles credenciales o secretos en stage:"
+    echo "$STAGED_SECRET_MATCHES" | head -n 5
+    exit 1
+fi
+
+echo "✅ [citas-api pre-commit] Verificaciones de seguridad superadas."
+exit 0

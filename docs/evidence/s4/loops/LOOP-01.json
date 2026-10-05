@@ -1,0 +1,22 @@
+{
+  "goal": "corregir exclusivamente el defecto de doble reserva de slots (RN-01)",
+  "scenario": "Dos pacientes concurrentes intentan reservar simultáneamente el mismo turno de Medicina General en HIC",
+  "iterations": [
+    {
+      "iteration": 1,
+      "builder": "Identificado método assignSlots sin cláusula 'AND appointment_id IS NULL' ni verificación de filas modificadas. Creado SchedulingConcurrencyTest con CyclicBarrier multihilo.",
+      "backendTests": "FAIL - Inicialmente ambas peticiones actualizaban la misma fila o una pisaba a la otra sin lanzar 409 CONFLICT.",
+      "verifier": "FAIL",
+      "findings": "Se requiere condición atómica de no-asignación previa y retorno de filas afectadas."
+    },
+    {
+      "iteration": 2,
+      "builder": "Actualizado ProfessionalSlotJpaRepository.assignSlots con 'WHERE id IN :slotIds AND s.appointmentId IS NULL' retornando int. En SchedulingService.bookAppointment se valida que assigned == slotIds.size(), lanzando SchedulingFailure.conflict si una concurrencia se adelanta.",
+      "backendTests": "PASS - SchedulingConcurrencyTest: 1 hilo obtiene 201 CREATED (APPROVED) y el otro hilo obtiene 409 CONFLICT.",
+      "verifier": "PASS",
+      "findings": "Condición de carrera resuelta a nivel de base de datos y validada en capa de aplicación. Transaccionalidad garantizada en SchedulingFacade."
+    }
+  ],
+  "result": "COMPLETED",
+  "finalVerifier": "PASS"
+}

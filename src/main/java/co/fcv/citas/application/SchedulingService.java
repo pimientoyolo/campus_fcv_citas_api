@@ -77,6 +77,43 @@ public class SchedulingService {
                 .orElseThrow(() -> SchedulingFailure.notFound("Perfil profesional no encontrado para este usuario."));
     }
 
+    public record UpdateProfessionalCommand(
+            String professionalCode,
+            String licenseNumber,
+            Boolean active,
+            List<Short> specialtyIds,
+            List<Short> locationIds
+    ) {}
+
+    public Professional updateProfessional(Long id, UpdateProfessionalCommand cmd) {
+        Professional existing = getProfessional(id);
+        List<Specialty> specs = existing.specialties();
+        if (cmd.specialtyIds() != null) {
+            specs = cmd.specialtyIds().stream()
+                    .map(sid -> catalogs.findSpecialtyById(sid).orElseThrow(() -> SchedulingFailure.notFound("Especialidad no encontrada: " + sid)))
+                    .toList();
+        }
+        List<Location> locs = existing.locations();
+        if (cmd.locationIds() != null) {
+            locs = cmd.locationIds().stream()
+                    .map(lid -> catalogs.findLocationById(lid).orElseThrow(() -> SchedulingFailure.notFound("Sede no encontrada: " + lid)))
+                    .toList();
+        }
+        Professional updated = new Professional(
+                existing.id(),
+                existing.userId(),
+                cmd.professionalCode() != null ? cmd.professionalCode().strip() : existing.professionalCode(),
+                cmd.licenseNumber() != null ? cmd.licenseNumber().strip() : existing.licenseNumber(),
+                cmd.active() != null ? cmd.active() : existing.active(),
+                existing.firstName(),
+                existing.lastName(),
+                existing.email(),
+                specs,
+                locs
+        );
+        return professionals.save(updated);
+    }
+
     // --- Bloques de Disponibilidad ---
     public record CreateBlockCommand(Long professionalId, Short locationId,
                                     LocalDate date, LocalTime startTime, LocalTime endTime) {}
@@ -238,9 +275,12 @@ public class SchedulingService {
                 null, cmd.patientUserId(), cmd.professionalId(), cmd.locationId(), cmd.specialtyId(),
                 status.id(), cmd.startAt(), endAt, null, null, null));
 
-        // Retener/asignar los slots a la cita creada
+        // Retener/asignar los slots a la cita creada de forma atómica y verificar concurrencia
         List<Long> slotIds = requiredSlots.stream().map(ProfessionalSlot::id).toList();
-        professionalSlots.assignSlots(slotIds, appointment.id());
+        int assigned = professionalSlots.assignSlots(slotIds, appointment.id());
+        if (assigned != slotIds.size()) {
+            throw SchedulingFailure.conflict("Uno o más turnos seleccionados ya fueron tomados simultáneamente por otra reserva.");
+        }
 
         // Registrar auditoría de estado inicial
         histories.record(new AppointmentStatusHistory(
@@ -357,6 +397,11 @@ public class SchedulingService {
             throw SchedulingFailure.invalid("Solo se pueden completar citas previamente aprobadas.");
         }
 
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (app.scheduledStartAt().isAfter(now)) {
+            throw SchedulingFailure.invalid("No se puede registrar atención en citas futuras (RF-17).");
+        }
+
         AppointmentStatus completed = catalogs.findStatusByCode(AppointmentStatus.COMPLETED)
                 .orElseThrow(() -> SchedulingFailure.invalid("Estado COMPLETED no configurado."));
 
@@ -384,6 +429,11 @@ public class SchedulingService {
                 .orElseThrow(() -> SchedulingFailure.invalid("Estado actual inválido."));
         if (!AppointmentStatus.APPROVED.equals(currentStatus.code())) {
             throw SchedulingFailure.invalid("Solo se puede registrar inasistencia en citas aprobadas.");
+        }
+
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (app.scheduledStartAt().isAfter(now)) {
+            throw SchedulingFailure.invalid("No se puede registrar inasistencia en citas futuras (RF-17).");
         }
 
         AppointmentStatus noShow = catalogs.findStatusByCode(AppointmentStatus.NO_SHOW)
@@ -416,7 +466,19 @@ public class SchedulingService {
         return appointments.findByFilters(statusId, locationId, professionalId, date);
     }
 
-    public List<AppointmentStatusHistory> getAppointmentHistory(Long appointmentId) {
+    public List<AppointmentStatusHistory> getAppointmentHistory(Long appointmentId, Long userId, boolean isAdmin) {
+        Appointment app = appointments.findById(appointmentId)
+                .orElseThrow(() -> SchedulingFailure.notFound("Cita no encontrada."));
+
+        if (!isAdmin && !app.patientUserId().equals(userId)) {
+            boolean isAssigned = professionals.findByUserId(userId)
+                    .map(p -> p.id().equals(app.professionalId()))
+                    .orElse(false);
+            if (!isAssigned) {
+                throw SchedulingFailure.forbidden("No tienes autorización para consultar el historial de esta cita.");
+            }
+        }
+
         return histories.findByAppointmentId(appointmentId);
     }
 }

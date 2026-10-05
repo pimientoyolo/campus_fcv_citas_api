@@ -125,8 +125,14 @@ public class AppointmentController {
     }
 
     @GetMapping("/appointments/{id}/history")
-    public ResponseEntity<List<AppointmentStatusHistory>> getHistory(@PathVariable Long id) {
-        return ResponseEntity.ok(facade.getAppointmentHistory(id));
+    public ResponseEntity<List<AppointmentStatusHistory>> getHistory(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt,
+            Authentication auth
+    ) {
+        Long userId = Long.valueOf(jwt.getSubject());
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        return ResponseEntity.ok(facade.getAppointmentHistory(id, userId, isAdmin));
     }
 
     // --- Administración ---

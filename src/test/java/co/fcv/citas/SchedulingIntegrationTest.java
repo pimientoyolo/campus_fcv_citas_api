@@ -37,6 +37,15 @@ class SchedulingIntegrationTest {
         registry.add("app.jwt.refresh-secret", () -> REFRESH);
     }
 
+    @org.springframework.boot.test.context.TestConfiguration
+    static class TestClockConfig {
+        @org.springframework.context.annotation.Bean
+        @org.springframework.context.annotation.Primary
+        java.time.Clock testClock() {
+            return java.time.Clock.fixed(java.time.Instant.parse("2026-10-01T07:00:00Z"), java.time.ZoneOffset.UTC);
+        }
+    }
+
 
 
     @Autowired MockMvc mvc;
