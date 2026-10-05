@@ -1,0 +1,159 @@
+{
+  "name": "WF-001 - FCV Citas Recordatorio de Citas Próximas",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "e4414f52-8789-4a9c-9c7e-1a2b3c4d5e6f",
+      "name": "Schedule Trigger (Cada hora)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://citas-api-dev:8080/api/integrations/appointments/upcoming?hoursAhead=24",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Integration-Key",
+              "value": "={{ $env.FCV_INTEGRATION_KEY || 'fcv-n8n-integration-secret-key-2026' }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "c1122334-5566-7788-99aa-bbccddeeff01",
+      "name": "Consultar Citas Próximas (citas-api)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "",
+        "options": {}
+      },
+      "id": "d2233445-6677-8899-aabb-ccddeeff0011",
+      "name": "Separar en Citas Individuales",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $json.patientEmail || 'paciente@fcv.test' }}",
+        "subject": "={{ 'Recordatorio Cita Médica FCV: ' + $json.specialtyName }}",
+        "message": "={{ 'Estimado(a) ' + $json.patientName + ',\n\nLe recordamos su cita de ' + $json.specialtyName + ' con el/la ' + $json.professionalName + ' programada para el ' + $json.scheduledStartAt + ' en la sede ' + $json.locationName + '.\n\nPor favor presentarse con 15 minutos de anticipación.\n\nAtentamente,\nFundación Cardiovascular de Colombia - FCV Citas' }}"
+      },
+      "id": "a3344556-7788-99aa-bbcc-ddeeff001122",
+      "name": "Enviar Notificación Correo / Gmail",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        910,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://citas-api-dev:8080/api/integrations/appointments/reminders",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Integration-Key",
+              "value": "={{ $env.FCV_INTEGRATION_KEY || 'fcv-n8n-integration-secret-key-2026' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ appointmentId: $json.appointmentId, channel: 'EMAIL' }) }}",
+        "options": {}
+      },
+      "id": "b4455667-8899-aabb-ccdd-eeff00112233",
+      "name": "Registrar Recordatorio Enviado",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1130,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Cada hora)": {
+      "main": [
+        [
+          {
+            "node": "Consultar Citas Próximas (citas-api)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Citas Próximas (citas-api)": {
+      "main": [
+        [
+          {
+            "node": "Separar en Citas Individuales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar en Citas Individuales": {
+      "main": [
+        [
+          {
+            "node": "Enviar Notificación Correo / Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Notificación Correo / Gmail": {
+      "main": [
+        [
+          {
+            "node": "Registrar Recordatorio Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fcv-s5-wf001-v1",
+  "id": "fcv-wf-001-reminders"
+}

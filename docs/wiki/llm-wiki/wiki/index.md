@@ -9,6 +9,7 @@
   - [Contrato REST de citas S3](contrato-citas.md)
   - [Modelo de datos y 3FN](modelo-datos.md)
   - [Evidencia y pendientes S2](s2-evidencia.md)
+  - [Seguridad y contenido no confiable S5](seguridad-contenido-no-confiable.md)
   - [Registro de cambios](log.md)
 - 📂 **Schema**
   - [Convenciones](../schema/convenciones.md)
